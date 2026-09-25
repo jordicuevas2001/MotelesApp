@@ -6,6 +6,8 @@ import 'widgets/cobro.dart';
 import 'widgets/hab_estados.dart';
 import 'screens/historial.dart';
 import 'screens/login.dart';
+import 'services/printer_service.dart';
+import 'package:app_moteles/screens/printer_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -116,12 +118,12 @@ class _MotelScreenState extends State<MotelScreen> {
 
                 
               //boton para tener el historial de los cortes
-              //la pantalla a la que pertenece: HistorialScreen
+              //la pantalla a la que pertenece: HistorialScreen / LoginScreen
               onPressed: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const LoginScreen(),
+                    builder: (context) => const PrinterPage(),
                   ),
                 );
               },

@@ -5,8 +5,8 @@ import 'package:http/http.dart' as http;
 /// - Emulador Android: 10.0.2.2 en vez de 127.0.0.1
 /// - Dispositivo físico: la IP de tu compu en la red local (ej. 192.168.1.50)
 /// - Chrome/desktop: 127.0.0.1 funciona directo
-const String kBaseUrl = "http://10.0.2.2:8000/api";
-//const String kBaseUrl = "http://192.168.1.145:8000/api";
+//const String kBaseUrl = "http://10.0.2.2:8000/api";
+ const String kBaseUrl = "http://192.168.1.166:8000/api";
 
 class ApiException implements Exception {
   final String message;

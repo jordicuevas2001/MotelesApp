@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../screens/habitacion.dart';
 import '../services/api_service.dart';
+import '../services/printer_service.dart';
+import '../screens/printer_page.dart'; // ajusta esta ruta si guardaste printer_page.dart en otro lugar
 
 class MostrarCobro {
   static void show(
@@ -34,6 +36,8 @@ class _CobroContenidoState extends State<_CobroContenido> {
   String? error;
   bool cobrando = false;
 
+  final printerService = PrinterService.instance;
+
   @override
   void initState() {
     super.initState();
@@ -53,9 +57,24 @@ class _CobroContenidoState extends State<_CobroContenido> {
   }
 
   Future<void> cobrar() async {
+    // Si no hay impresora conectada, preguntamos antes de cobrar
+    // (una vez que se cobra, el cuarto ya se libera en el backend).
+    if (!printerService.isConnected) {
+      final continuar = await _mostrarDialogoSinImpresora();
+      if (continuar != true) return; // canceló, o se fue a conectar y regresamos sin confirmar
+    }
+
     setState(() => cobrando = true);
+
     try {
-      await ApiService.registrarSalida(widget.habitacion.id);
+      final resultado = await ApiService.registrarSalida(widget.habitacion.id);
+
+      // Imprime si quedó conectada (ya sea que lo estuviera desde antes,
+      // o que el usuario se haya conectado en el paso anterior).
+      if (printerService.isConnected) {
+        await _imprimirTicket(resultado);
+      }
+
       if (mounted) Navigator.pop(context);
       widget.actualizar();
     } on ApiException catch (e) {
@@ -65,6 +84,62 @@ class _CobroContenidoState extends State<_CobroContenido> {
           SnackBar(content: Text(e.message)),
         );
       }
+    }
+  }
+
+  Future<bool?> _mostrarDialogoSinImpresora() {
+    return showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: const Color(0xff252536),
+        title: const Text('Sin impresora conectada', style: TextStyle(color: Colors.white)),
+        content: const Text(
+          'No hay ninguna impresora Bluetooth conectada. ¿Qué quieres hacer?',
+          style: TextStyle(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context, false);
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const PrinterPage()),
+              );
+              if (mounted) setState(() {}); // refresca el estado de conexión al volver
+            },
+            child: const Text('Conectar impresora'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Cobrar sin ticket'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _imprimirTicket(Map<String, dynamic> resultado) async {
+    final registro = resultado['registro'];
+    final cuarto = registro['cuarto'];
+    final motel = cuarto?['moteles']?['nombre'] ?? 'Motel';
+    final total = double.parse(resultado['total'].toString()).toStringAsFixed(0);
+
+    final ok = await printerService.imprimirTicket(
+      motel: motel,
+      numeroCuarto: widget.habitacion.numero,
+      horaEntrada: formatearHora(registro['hora_entrada']),
+      horaSalida: formatearHora(registro['hora_salida']),
+      total: total,
+    );
+
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Se cobró, pero no se pudo imprimir el ticket.')),
+      );
     }
   }
 
@@ -137,6 +212,30 @@ class _CobroContenidoState extends State<_CobroContenido> {
         dato("Tiempo transcurrido", formatearTiempo(minutos)),
         const SizedBox(height: 15),
         dato("Total", "\$${double.parse(total.toString()).toStringAsFixed(0)}"),
+        const SizedBox(height: 15),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text("Impresora", style: TextStyle(color: Colors.white70, fontSize: 14)),
+            Row(
+              children: [
+                Icon(
+                  printerService.isConnected ? Icons.print : Icons.print_disabled,
+                  size: 16,
+                  color: printerService.isConnected ? Colors.greenAccent : Colors.white38,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  printerService.isConnected ? 'Conectada' : 'No conectada',
+                  style: TextStyle(
+                    color: printerService.isConnected ? Colors.greenAccent : Colors.white38,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
         const Spacer(),
         SizedBox(
           width: 300,
