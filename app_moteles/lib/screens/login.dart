@@ -1,7 +1,132 @@
 import 'package:flutter/material.dart';
+import 'package:app_moteles/main.dart';
+import 'package:app_moteles/services/api_service.dart';
+import 'package:app_moteles/screens/adminscreen/reportes_admin.dart';
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController passwordController = TextEditingController();
+
+  bool cargando = false;
+  bool mostrarPassword = false;
+
+  @override
+  void dispose() {
+    emailController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
+  // ============================================================
+  // LOGIN
+  // ============================================================
+
+  Future<void> iniciarSesion() async {
+    final email = emailController.text.trim();
+    final password = passwordController.text;
+
+    if (email.isEmpty || password.isEmpty) {
+      mostrarMensaje(
+        'Ingresa tu correo y contraseña',
+      );
+      return;
+    }
+
+    setState(() {
+      cargando = true;
+    });
+
+    try {
+      final respuesta = await ApiService.login(
+        email,
+        password,
+      );
+
+      if (!mounted) return;
+
+      final usuario =
+          respuesta['usuario'] as Map<String, dynamic>;
+
+      final rol = usuario['rol']?.toString();
+
+      print('==============================');
+      print('LOGIN CORRECTO');
+      print('ID: ${usuario['id']}');
+      print('NOMBRE: ${usuario['name']}');
+      print('EMAIL: ${usuario['email']}');
+      print('ROL: $rol');
+      print('MOTEL ID: ${usuario['motel_id']}');
+      print('MOTEL: ${usuario['motel']}');
+      print('==============================');
+
+      // ========================================================
+      // ADMINISTRADOR
+      // ========================================================
+
+      if (rol == 'admin') {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const ReportesAdmin(),
+          ),
+          (route) => false,
+        );
+
+        return;
+      }
+
+      // ========================================================
+      // USUARIO NORMAL
+      // ========================================================
+
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const MotelScreen(),
+        ),
+        (route) => false,
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      mostrarMensaje(
+        e.toString().replaceFirst(
+          'Exception: ',
+          '',
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          cargando = false;
+        });
+      }
+    }
+  }
+
+  // ============================================================
+  // MENSAJE
+  // ============================================================
+
+  void mostrarMensaje(String mensaje) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(mensaje),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  // ============================================================
+  // UI
+  // ============================================================
 
   @override
   Widget build(BuildContext context) {
@@ -12,24 +137,35 @@ class LoginScreen extends StatelessWidget {
 
     return Scaffold(
       backgroundColor: background,
+
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(20),
+
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 400),
+              constraints: const BoxConstraints(
+                maxWidth: 400,
+              ),
+
               child: Column(
                 children: [
+                  // ==================================================
+                  // LOGO
+                  // ==================================================
 
-                  /// Logo
                   Container(
                     width: 70,
                     height: 70,
+
                     decoration: BoxDecoration(
                       color: gold.withOpacity(.15),
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: gold),
+                      border: Border.all(
+                        color: gold,
+                      ),
                     ),
+
                     child: const Icon(
                       Icons.bed,
                       color: gold,
@@ -61,9 +197,13 @@ class LoginScreen extends StatelessWidget {
 
                   const SizedBox(height: 35),
 
-                  /// Card Login
+                  // ==================================================
+                  // CARD LOGIN
+                  // ==================================================
+
                   Container(
                     padding: const EdgeInsets.all(24),
+
                     decoration: BoxDecoration(
                       color: cardColor,
                       borderRadius: BorderRadius.circular(20),
@@ -71,10 +211,12 @@ class LoginScreen extends StatelessWidget {
                         color: Colors.white10,
                       ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
 
+                    child: Column(
+                      crossAxisAlignment:
+                          CrossAxisAlignment.start,
+
+                      children: [
                         const Text(
                           "Iniciar sesión",
                           style: TextStyle(
@@ -95,8 +237,12 @@ class LoginScreen extends StatelessWidget {
 
                         const SizedBox(height: 30),
 
+                        // ==================================================
+                        // CORREO
+                        // ==================================================
+
                         const Text(
-                          "USUARIO",
+                          "CORREO ELECTRÓNICO",
                           style: TextStyle(
                             color: Colors.grey,
                             fontSize: 12,
@@ -107,25 +253,48 @@ class LoginScreen extends StatelessWidget {
                         const SizedBox(height: 10),
 
                         TextField(
-                          style: const TextStyle(color: Colors.white),
+                          controller: emailController,
+
+                          keyboardType:
+                              TextInputType.emailAddress,
+
+                          style: const TextStyle(
+                            color: Colors.white,
+                          ),
+
                           decoration: InputDecoration(
-                            hintText: "Usuario",
+                            hintText:
+                                "correo@ejemplo.com",
+
                             hintStyle:
-                                const TextStyle(color: Colors.grey),
-                            prefixIcon: const Icon(
-                              Icons.person_outline,
+                                const TextStyle(
                               color: Colors.grey,
                             ),
+
+                            prefixIcon:
+                                const Icon(
+                              Icons.email_outlined,
+                              color: Colors.grey,
+                            ),
+
                             filled: true,
                             fillColor: inputColor,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide.none,
+
+                            border:
+                                OutlineInputBorder(
+                              borderRadius:
+                                  BorderRadius.circular(14),
+                              borderSide:
+                                  BorderSide.none,
                             ),
                           ),
                         ),
 
                         const SizedBox(height: 22),
+
+                        // ==================================================
+                        // CONTRASEÑA
+                        // ==================================================
 
                         const Text(
                           "CONTRASEÑA",
@@ -139,51 +308,124 @@ class LoginScreen extends StatelessWidget {
                         const SizedBox(height: 10),
 
                         TextField(
-                          obscureText: true,
-                          style: const TextStyle(color: Colors.white),
+                          controller: passwordController,
+
+                          obscureText:
+                              !mostrarPassword,
+
+                          style: const TextStyle(
+                            color: Colors.white,
+                          ),
+
+                          onSubmitted: (_) {
+                            if (!cargando) {
+                              iniciarSesion();
+                            }
+                          },
+
                           decoration: InputDecoration(
                             hintText: "••••••••",
+
                             hintStyle:
-                                const TextStyle(color: Colors.grey),
-                            prefixIcon: const Icon(
+                                const TextStyle(
+                              color: Colors.grey,
+                            ),
+
+                            prefixIcon:
+                                const Icon(
                               Icons.lock_outline,
                               color: Colors.grey,
                             ),
-                            suffixIcon: IconButton(
-                              icon: const Icon(
-                                Icons.visibility_outlined,
+
+                            suffixIcon:
+                                IconButton(
+                              icon: Icon(
+                                mostrarPassword
+                                    ? Icons
+                                        .visibility_off_outlined
+                                    : Icons
+                                        .visibility_outlined,
                                 color: Colors.grey,
                               ),
-                              onPressed: () {},
+
+                              onPressed: () {
+                                setState(() {
+                                  mostrarPassword =
+                                      !mostrarPassword;
+                                });
+                              },
                             ),
+
                             filled: true,
                             fillColor: inputColor,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              borderSide: BorderSide.none,
+
+                            border:
+                                OutlineInputBorder(
+                              borderRadius:
+                                  BorderRadius.circular(14),
+                              borderSide:
+                                  BorderSide.none,
                             ),
                           ),
                         ),
 
                         const SizedBox(height: 30),
 
+                        // ==================================================
+                        // BOTÓN
+                        // ==================================================
+
                         SizedBox(
                           width: double.infinity,
                           height: 55,
+
                           child: ElevatedButton.icon(
-                            onPressed: () {},
-                            icon: const Icon(Icons.login),
-                            label: const Text(
-                              "Entrar al sistema",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
+                            onPressed:
+                                cargando
+                                    ? null
+                                    : iniciarSesion,
+
+                            icon: cargando
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child:
+                                        CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.black,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.login,
+                                  ),
+
+                            label: Text(
+                              cargando
+                                  ? "Iniciando sesión..."
+                                  : "Entrar al sistema",
+
+                              style:
+                                  const TextStyle(
+                                fontWeight:
+                                    FontWeight.bold,
                               ),
                             ),
-                            style: ElevatedButton.styleFrom(
+
+                            style:
+                                ElevatedButton.styleFrom(
                               backgroundColor: gold,
-                              foregroundColor: Colors.black,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
+                              foregroundColor:
+                                  Colors.black,
+
+                              disabledBackgroundColor:
+                                  gold.withOpacity(.5),
+
+                              shape:
+                                  RoundedRectangleBorder(
+                                borderRadius:
+                                    BorderRadius.circular(
+                                  14,
+                                ),
                               ),
                             ),
                           ),

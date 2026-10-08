@@ -31,20 +31,23 @@ class Bitacora extends Model
 
     public function usuario(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'usuario_id');
+        return $this->belongsTo(Usuarios::class, 'usuario_id');
     }
 
     /**
-     * Calcula el cobro según las franjas configuradas en config/tarifas.php
-     * para el motel al que pertenece el cuarto de este registro.
+     * Calcula el cobro según las franjas configuradas
+     * en config/tarifas.php para el motel del cuarto.
      */
     public function calcularCobro(int $minutos): float
     {
         $motelId = $this->cuarto->motel_id;
+
         $config = config("tarifas.moteles.$motelId");
 
         if (!$config) {
-            throw new \RuntimeException("No hay tarifas configuradas para el motel $motelId");
+            throw new \RuntimeException(
+                "No hay tarifas configuradas para el motel $motelId"
+            );
         }
 
         foreach ($config['franjas'] as $franja) {
@@ -54,9 +57,12 @@ class Bitacora extends Model
         }
 
         $ultima = end($config['franjas']);
+
         $minutosExtra = $minutos - ($ultima['horas'] * 60);
+
         $horasExtra = (int) ceil($minutosExtra / 60);
 
-        return (float) $ultima['precio'] + ($horasExtra * $config['precio_hora_extra']);
+        return (float) $ultima['precio']
+            + ($horasExtra * $config['precio_hora_extra']);
     }
 }
