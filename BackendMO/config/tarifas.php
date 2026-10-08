@@ -1,24 +1,41 @@
 <?php
 
 return [
+
     'moteles' => [
+
         1 => [ // El Faraón
+
             'franjas' => [
-                ['horas' => 1, 'precio' => 50],
-                ['horas' => 2, 'precio' => 80],
-                ['horas' => 3, 'precio' => 100],
-                ['horas' => 4, 'precio' => 120],
+                [
+                    'horas' => 1,
+                    'precio' => 170,
+                ],
+                [
+                    'horas' => 2,
+                    'precio' => 210,
+                ],
             ],
-            'precio_hora_extra' => 30,
+
+            'precio_hora_extra' => 80,
         ],
-        2 => [ // La curva
+
+        2 => [ // La Curva
+
             'franjas' => [
-                ['horas' => 1, 'precio' => 50],
-                ['horas' => 2, 'precio' => 80],
-                ['horas' => 3, 'precio' => 100],
-                ['horas' => 4, 'precio' => 120],
+                [
+                    'horas' => 1,
+                    'precio' => 170,
+                ],
+                [
+                    'horas' => 2,
+                    'precio' => 210,
+                ],
             ],
-            'precio_hora_extra' => 30,
+
+            'precio_hora_extra' => 80,
         ],
+
     ],
+
 ];

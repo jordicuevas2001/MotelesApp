@@ -6,10 +6,11 @@ import 'widgets/cobro.dart';
 import 'widgets/hab_estados.dart';
 import 'screens/historial.dart';
 import 'screens/login.dart';
-import 'services/printer_service.dart';
-import 'package:app_moteles/screens/printer_page.dart';
+import 'screens/adminscreen/reportes_admin.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+
   runApp(const MyApp());
 }
 
@@ -22,9 +23,114 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Control de Entradas y Salidas',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.deepPurple,
+        ),
       ),
-      home: const MotelScreen(),
+      home: const InicioScreen(),
+    );
+  }
+}
+
+class InicioScreen extends StatefulWidget {
+  const InicioScreen({super.key});
+
+  @override
+  State<InicioScreen> createState() => _InicioScreenState();
+}
+
+class _InicioScreenState extends State<InicioScreen> {
+  @override
+  void initState() {
+    super.initState();
+
+    verificarSesion();
+  }
+
+  Future<void> verificarSesion() async {
+    try {
+      final tieneSesion =
+          await ApiService.tieneSesion();
+
+      if (!tieneSesion) {
+        if (!mounted) return;
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                const LoginScreen(),
+          ),
+        );
+
+        return;
+      }
+
+      final usuario =
+          await ApiService.obtenerUsuario();
+
+      if (!mounted) return;
+
+      if (usuario == null) {
+        await ApiService.cerrarSesion();
+
+        if (!mounted) return;
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                const LoginScreen(),
+          ),
+        );
+
+        return;
+      }
+
+      final rol = usuario['rol'];
+
+      if (rol == 'admin') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                const ReportesAdmin(),
+          ),
+        );
+
+        return;
+      }
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              const MotelScreen(),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) =>
+              const LoginScreen(),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor:
+          Color(0xFF0F141C),
+      body: Center(
+        child: CircularProgressIndicator(
+          color: Color(0xFFC58B2A),
+        ),
+      ),
     );
   }
 }
@@ -33,19 +139,67 @@ class MotelScreen extends StatefulWidget {
   const MotelScreen({super.key});
 
   @override
-  State<MotelScreen> createState() => _MotelScreenState();
+  State<MotelScreen> createState() =>
+      _MotelScreenState();
 }
 
-class _MotelScreenState extends State<MotelScreen> {
+class _MotelScreenState
+    extends State<MotelScreen> {
   List<Habitacion> habitaciones = [];
+
   bool cargando = true;
+
   String? error;
+
+  // NOMBRE DEL MOTEL
+
+  String nombreMotel =
+      'MOTEL EL FARAON';
 
   @override
   void initState() {
     super.initState();
-    cargarCuartos();
+
+    cargarDatos();
   }
+
+  // CARGAR USUARIO Y CUARTOS
+
+  Future<void> cargarDatos() async {
+    try {
+      final usuario =
+          await ApiService.obtenerUsuario();
+
+      if (!mounted) return;
+
+      if (usuario != null) {
+        final motel =
+            usuario['motel'];
+
+        if (motel != null) {
+          final nombre =
+              motel['nombre'];
+
+          if (nombre != null) {
+            setState(() {
+              nombreMotel =
+                  nombre
+                      .toString()
+                      .toUpperCase();
+            });
+          }
+        }
+      }
+    } catch (e) {
+      print(
+        'ERROR OBTENIENDO MOTEL: $e',
+      );
+    }
+
+    await cargarCuartos();
+  }
+
+  // CARGAR CUARTOS
 
   Future<void> cargarCuartos() async {
     setState(() {
@@ -54,12 +208,24 @@ class _MotelScreenState extends State<MotelScreen> {
     });
 
     try {
-      final data = await ApiService.obtenerCuartos();
+      final data =
+          await ApiService.obtenerCuartos();
+
+      if (!mounted) return;
+
       setState(() {
-        habitaciones = data.map((j) => Habitacion.fromJson(j)).toList();
+        habitaciones = data
+            .map(
+              (j) =>
+                  Habitacion.fromJson(j),
+            )
+            .toList();
+
         cargando = false;
       });
     } catch (e) {
+      if (!mounted) return;
+
       setState(() {
         error = e.toString();
         cargando = false;
@@ -67,114 +233,316 @@ class _MotelScreenState extends State<MotelScreen> {
     }
   }
 
-  String formatoTiempo(Duration tiempo) {
-    String horas = tiempo.inHours.toString().padLeft(2, '0');
-    String minutos = (tiempo.inMinutes % 60).toString().padLeft(2, '0');
-    String segundos = (tiempo.inSeconds % 60).toString().padLeft(2, '0');
+  // CERRAR SESIÓN
+
+  Future<void> cerrarSesion() async {
+    final confirmar =
+        await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor:
+              const Color(0xFF171E2A),
+
+          title: const Text(
+            'Cerrar sesión',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight:
+                  FontWeight.bold,
+            ),
+          ),
+
+          content: const Text(
+            '¿Seguro que deseas cerrar la sesión?',
+            style: TextStyle(
+              color: Colors.white70,
+            ),
+          ),
+
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(
+                  context,
+                  false,
+                );
+              },
+              child: const Text(
+                'Cancelar',
+                style: TextStyle(
+                  color: Colors.white70,
+                ),
+              ),
+            ),
+
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(
+                  context,
+                  true,
+                );
+              },
+              style:
+                  ElevatedButton.styleFrom(
+                backgroundColor:
+                    Colors.red,
+                foregroundColor:
+                    Colors.white,
+              ),
+              child: const Text(
+                'Cerrar sesión',
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmar != true) {
+      return;
+    }
+
+    try {
+      await ApiService.cerrarSesion();
+    } catch (e) {
+      // Aunque falle la petición,
+      // se cerrará la sesión localmente.
+    }
+
+    if (!mounted) return;
+
+    Navigator.pushAndRemoveUntil(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            const LoginScreen(),
+      ),
+      (route) => false,
+    );
+  }
+
+  // FORMATO TIEMPO
+
+  String formatoTiempo(
+    Duration tiempo,
+  ) {
+    String horas =
+        tiempo.inHours
+            .toString()
+            .padLeft(2, '0');
+
+    String minutos =
+        (tiempo.inMinutes % 60)
+            .toString()
+            .padLeft(2, '0');
+
+    String segundos =
+        (tiempo.inSeconds % 60)
+            .toString()
+            .padLeft(2, '0');
 
     return "$horas:$minutos:$segundos";
   }
 
+  // BUILD
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(
+    BuildContext context,
+  ) {
     return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 30, 31, 30),
+      backgroundColor:
+          const Color.fromARGB(
+        255,
+        30,
+        31,
+        30,
+      ),
+
+      // APP BAR
+
       appBar: AppBar(
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
+        backgroundColor:
+            Colors.deepPurple,
+
+        foregroundColor:
+            Colors.white,
+
         titleSpacing: 16,
-        title: const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+
+        title: Column(
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
+
+          mainAxisSize:
+              MainAxisSize.min,
+
           children: [
-            Text(
+            const Text(
               "SISTEMA DE CONTROL",
               style: TextStyle(
                 color: Colors.white70,
                 fontSize: 12,
-                fontWeight: FontWeight.w600,
+                fontWeight:
+                    FontWeight.w600,
                 letterSpacing: 0.5,
               ),
             ),
+
             Text(
-              "MOTEL EL FARAON",
-              style: TextStyle(
+              nombreMotel,
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 18,
-                fontWeight: FontWeight.bold,
+                fontWeight:
+                    FontWeight.bold,
               ),
             ),
           ],
         ),
+
         actions: [
+
+          // ACTUALIZAR
+
           IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: cargarCuartos,
+            icon: const Icon(
+              Icons.refresh,
+            ),
+            onPressed:
+                cargarCuartos,
             tooltip: 'Actualizar',
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: OutlinedButton.icon(
 
-                
-              //boton para tener el historial de los cortes
-              //la pantalla a la que pertenece: HistorialScreen / LoginScreen
+          // HISTORIAL
+
+          Padding(
+            padding:
+                const EdgeInsets.only(
+              right: 12,
+            ),
+
+            child:
+                OutlinedButton.icon(
               onPressed: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const PrinterPage(),
+                    builder: (context) =>
+                        const HistorialScreen(),
                   ),
                 );
               },
-              
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white,
-                side: const BorderSide(color: Colors.white54),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20),
+
+              style:
+                  OutlinedButton.styleFrom(
+                foregroundColor:
+                    Colors.white,
+
+                side:
+                    const BorderSide(
+                  color:
+                      Colors.white54,
                 ),
-                padding: const EdgeInsets.symmetric(
+
+                shape:
+                    RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(
+                    20,
+                  ),
+                ),
+
+                padding:
+                    const EdgeInsets
+                        .symmetric(
                   horizontal: 14,
                   vertical: 8,
                 ),
               ),
-              icon: const Icon(Icons.access_time, size: 18),
-              label: const Text("Historial"),
+
+              icon: const Icon(
+                Icons.access_time,
+                size: 18,
+              ),
+
+              label: const Text(
+                "Historial",
+              ),
             ),
           ),
         ],
       ),
+
+      // ========================================================
+      // BODY
+      // ========================================================
+
       body: _buildBody(),
     );
   }
-  
+
+  // ============================================================
+  // BODY
+  // ============================================================
 
   Widget _buildBody() {
     if (cargando) {
       return const Center(
-        child: CircularProgressIndicator(color: Colors.white),
+        child:
+            CircularProgressIndicator(
+          color: Colors.white,
+        ),
       );
     }
 
     if (error != null) {
       return Center(
         child: Padding(
-          padding: const EdgeInsets.all(24),
+          padding:
+              const EdgeInsets.all(24),
+
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisSize:
+                MainAxisSize.min,
+
             children: [
-              const Icon(Icons.wifi_off, color: Colors.white54, size: 48),
-              const SizedBox(height: 12),
+              const Icon(
+                Icons.wifi_off,
+                color:
+                    Colors.white54,
+                size: 48,
+              ),
+
+              const SizedBox(
+                height: 12,
+              ),
+
               Text(
                 "No se pudo conectar con el servidor.\n$error",
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white70),
+
+                textAlign:
+                    TextAlign.center,
+
+                style:
+                    const TextStyle(
+                  color:
+                      Colors.white70,
+                ),
               ),
-              const SizedBox(height: 16),
+
+              const SizedBox(
+                height: 16,
+              ),
+
               ElevatedButton(
-                onPressed: cargarCuartos,
-                child: const Text("Reintentar"),
+                onPressed:
+                    cargarCuartos,
+                child:
+                    const Text(
+                  "Reintentar",
+                ),
               ),
             ],
           ),
@@ -183,130 +551,292 @@ class _MotelScreenState extends State<MotelScreen> {
     }
 
     return Padding(
-      padding: const EdgeInsets.all(12),
+      padding:
+          const EdgeInsets.all(12),
+
       child: Column(
         children: [
-          EstadisticasHeader(habitaciones: habitaciones),
-          const SizedBox(height: 12),
+          // ======================================================
+          // ESTADÍSTICAS
+          // ======================================================
+
+          EstadisticasHeader(
+            habitaciones:
+                habitaciones,
+          ),
+
+          const SizedBox(
+            height: 12,
+          ),
+
+          // ======================================================
+          // CUARTOS
+          // ======================================================
+
           Expanded(
-            child: GridView.builder(
-              itemCount: habitaciones.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            child:
+                GridView.builder(
+              itemCount:
+                  habitaciones.length,
+
+              gridDelegate:
+                  const SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 1.3,
+
+                crossAxisSpacing:
+                    12,
+
+                mainAxisSpacing:
+                    12,
+
+                childAspectRatio:
+                    1.3,
               ),
-              itemBuilder: (context, index) {
-                final habitacion = habitaciones[index];
+
+              itemBuilder:
+                  (context, index) {
+                final habitacion =
+                    habitaciones[
+                        index];
 
                 return Card(
                   elevation: 6,
-                  color: const Color.fromARGB(255, 64, 71, 64),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
+
+                  color:
+                      const Color.fromARGB(
+                    255,
+                    64,
+                    71,
+                    64,
                   ),
+
+                  shape:
+                      RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius
+                            .circular(
+                      15,
+                    ),
+                  ),
+
                   child: InkWell(
-                    borderRadius: BorderRadius.circular(15),
+                    borderRadius:
+                        BorderRadius
+                            .circular(
+                      15,
+                    ),
+
                     onTap: () {
-                      if (habitacion.ocupada) {
-                        MostrarCobro.show(context, habitacion, () {
-                          cargarCuartos(); // recarga desde el backend tras cobrar
-                        });
+                      if (habitacion
+                          .ocupada) {
+                        MostrarCobro
+                            .show(
+                          context,
+                          habitacion,
+                          () {
+                            cargarCuartos();
+                          },
+                        );
                       } else {
-                        MostrarRegistro.show(context, habitacion, () {
-                          cargarCuartos(); // recarga desde el backend tras registrar
-                        });
+                        MostrarRegistro
+                            .show(
+                          context,
+                          habitacion,
+                          () {
+                            cargarCuartos();
+                          },
+                        );
                       }
                     },
-                    child: Stack(
+
+                    child:
+                        Stack(
                       children: [
+                        // ==================================================
+                        // ESTADO
+                        // ==================================================
+
                         Positioned(
                           top: 10,
                           right: 10,
+
                           child: Icon(
                             Icons.circle,
-                            color: habitacion.ocupada
+
+                            color: habitacion
+                                    .ocupada
                                 ? Colors.red
-                                : Colors.greenAccent,
+                                : Colors
+                                    .greenAccent,
+
                             size: 15,
                           ),
                         ),
+
+                        // ==================================================
+                        // CONTENIDO
+                        // ==================================================
+
                         Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                          child:
+                              Column(
+                            mainAxisAlignment:
+                                MainAxisAlignment
+                                    .center,
+
                             children: [
+                              // ============================================
+                              // CUARTO
+                              // ============================================
+
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisAlignment:
+                                    MainAxisAlignment
+                                        .center,
+
                                 children: [
                                   Text(
                                     "Cuarto ${habitacion.numero}",
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
+
+                                    style:
+                                        const TextStyle(
+                                      color:
+                                          Colors.white,
+
+                                      fontSize:
+                                          22,
+
+                                      fontWeight:
+                                          FontWeight
+                                              .bold,
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
+
+                                  const SizedBox(
+                                    width: 8,
+                                  ),
+
                                   const Icon(
                                     Icons.hotel,
-                                    color: Colors.white,
+
+                                    color:
+                                        Colors.white,
+
                                     size: 35,
                                   ),
                                 ],
                               ),
 
-                              const SizedBox(height: 8),
+                              const SizedBox(
+                                height: 8,
+                              ),
 
-                              /// CRONÓMETRO
-                              StreamBuilder<int>(
-                                stream: Stream.periodic(
-                                  const Duration(seconds: 1),
-                                  (x) => x,
+                              // ============================================
+                              // TIEMPO
+                              // ============================================
+
+                              StreamBuilder<
+                                  int>(
+                                stream:
+                                    Stream.periodic(
+                                  const Duration(
+                                    seconds:
+                                        1,
+                                  ),
+                                  (x) =>
+                                      x,
                                 ),
-                                builder: (context, snapshot) {
-                                  if (!habitacion.ocupada ||
-                                      habitacion.horaEntrada == null) {
+
+                                builder:
+                                    (
+                                  context,
+                                  snapshot,
+                                ) {
+                                  if (!habitacion
+                                          .ocupada ||
+                                      habitacion
+                                              .horaEntrada ==
+                                          null) {
                                     return const Text(
                                       "Disponible",
-                                      style: TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 16,
+
+                                      style:
+                                          TextStyle(
+                                        color:
+                                            Colors.white70,
+
+                                        fontSize:
+                                            16,
                                       ),
                                     );
                                   }
 
-                                  final tiempo = DateTime.now().difference(
-                                    habitacion.horaEntrada!,
+                                  final tiempo =
+                                      DateTime.now()
+                                          .difference(
+                                    habitacion
+                                        .horaEntrada!,
                                   );
 
                                   return Text(
-                                    formatoTiempo(tiempo),
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
+                                    formatoTiempo(
+                                      tiempo,
+                                    ),
+
+                                    style:
+                                        const TextStyle(
+                                      color:
+                                          Colors.white,
+
+                                      fontSize:
+                                          16,
+
+                                      fontWeight:
+                                          FontWeight
+                                              .bold,
                                     ),
                                   );
                                 },
                               ),
 
-                              const SizedBox(height: 8),
+                              const SizedBox(
+                                height: 8,
+                              ),
+
+                              // ============================================
+                              // TEXTO
+                              // ============================================
 
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children:  [
+                                mainAxisAlignment:
+                                    MainAxisAlignment
+                                        .center,
+
+                                children: const [
                                   Icon(
-                                    Icons.touch_app,
-                                    color: Colors.white,
+                                    Icons
+                                        .touch_app,
+
+                                    color:
+                                        Colors.white,
+
                                     size: 25,
                                   ),
-                                  SizedBox(width: 5),
+
+                                  SizedBox(
+                                    width: 5,
+                                  ),
+
                                   Text(
-                                    "Toca para registrar${habitacion.ocupada ? " el cobro" : ""}",
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 10,
+                                    "Toca para registrar",
+
+                                    style:
+                                        TextStyle(
+                                      color:
+                                          Colors.white70,
+
+                                      fontSize:
+                                          10,
                                     ),
                                   ),
                                 ],
@@ -321,11 +851,66 @@ class _MotelScreenState extends State<MotelScreen> {
               },
             ),
           ),
+
+          const SizedBox(
+            height: 12,
+          ),
+
+          // ========================================================
+          // CERRAR SESIÓN
+          // ========================================================
+
+          SizedBox(
+            width:
+                double.infinity,
+
+            height: 52,
+
+            child:
+                ElevatedButton.icon(
+              onPressed:
+                  cerrarSesion,
+
+              icon: const Icon(
+                Icons.logout,
+                color:
+                    Colors.white,
+              ),
+
+              label: const Text(
+                "CERRAR SESIÓN",
+
+                style: TextStyle(
+                  color:
+                      Colors.white,
+                  fontSize: 16,
+                  fontWeight:
+                      FontWeight.bold,
+                ),
+              ),
+
+              style:
+                  ElevatedButton.styleFrom(
+                backgroundColor:
+                    Colors.red,
+
+                foregroundColor:
+                    Colors.white,
+
+                elevation: 4,
+
+                shape:
+                    RoundedRectangleBorder(
+                  borderRadius:
+                      BorderRadius.circular(
+                    12,
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 }
-
-
-//Prueba de commit

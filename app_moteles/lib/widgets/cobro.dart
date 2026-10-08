@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../screens/habitacion.dart';
 import '../services/api_service.dart';
 import '../services/printer_service.dart';
-import '../screens/printer_page.dart'; // ajusta esta ruta si guardaste printer_page.dart en otro lugar
+import '../screens/printer_page.dart';
 
 class MostrarCobro {
   static void show(
@@ -15,7 +15,10 @@ class MostrarCobro {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (_) {
-        return _CobroContenido(habitacion: habitacion, actualizar: actualizar);
+        return _CobroContenido(
+          habitacion: habitacion,
+          actualizar: actualizar,
+        );
       },
     );
   }
@@ -25,7 +28,10 @@ class _CobroContenido extends StatefulWidget {
   final Habitacion habitacion;
   final VoidCallback actualizar;
 
-  const _CobroContenido({required this.habitacion, required this.actualizar});
+  const _CobroContenido({
+    required this.habitacion,
+    required this.actualizar,
+  });
 
   @override
   State<_CobroContenido> createState() => _CobroContenidoState();
@@ -46,7 +52,10 @@ class _CobroContenidoState extends State<_CobroContenido> {
 
   Future<void> cargarPreview() async {
     try {
-      final data = await ApiService.previewCobro(widget.habitacion.id);
+      final data = await ApiService.previewCobro(
+        widget.habitacion.id,
+      );
+
       setState(() {
         preview = data;
         error = null;
@@ -57,28 +66,36 @@ class _CobroContenidoState extends State<_CobroContenido> {
   }
 
   Future<void> cobrar() async {
-    // Si no hay impresora conectada, preguntamos antes de cobrar
-    // (una vez que se cobra, el cuarto ya se libera en el backend).
+    // Si no hay impresora conectada, preguntamos antes de cobrar.
+    // Una vez que se cobra, el cuarto se libera en el backend.
     if (!printerService.isConnected) {
       final continuar = await _mostrarDialogoSinImpresora();
-      if (continuar != true) return; // canceló, o se fue a conectar y regresamos sin confirmar
+
+      if (continuar != true) {
+        return;
+      }
     }
 
     setState(() => cobrando = true);
 
     try {
-      final resultado = await ApiService.registrarSalida(widget.habitacion.id);
+      final resultado = await ApiService.registrarSalida(
+        widget.habitacion.id,
+      );
 
-      // Imprime si quedó conectada (ya sea que lo estuviera desde antes,
-      // o que el usuario se haya conectado en el paso anterior).
+      // Imprime solamente si hay impresora conectada.
       if (printerService.isConnected) {
         await _imprimirTicket(resultado);
       }
 
-      if (mounted) Navigator.pop(context);
+      if (mounted) {
+        Navigator.pop(context);
+      }
+
       widget.actualizar();
     } on ApiException catch (e) {
       setState(() => cobrando = false);
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(e.message)),
@@ -92,9 +109,13 @@ class _CobroContenidoState extends State<_CobroContenido> {
       context: context,
       builder: (_) => AlertDialog(
         backgroundColor: const Color(0xff252536),
-        title: const Text('Sin impresora conectada', style: TextStyle(color: Colors.white)),
+        title: const Text(
+          'Sin impresora conectada',
+          style: TextStyle(color: Colors.white),
+        ),
         content: const Text(
-          'No hay ninguna impresora Bluetooth conectada. ¿Qué quieres hacer?',
+          'No hay ninguna impresora Bluetooth conectada. '
+          '¿Qué quieres hacer?',
           style: TextStyle(color: Colors.white70),
         ),
         actions: [
@@ -105,11 +126,17 @@ class _CobroContenidoState extends State<_CobroContenido> {
           TextButton(
             onPressed: () async {
               Navigator.pop(context, false);
+
               await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const PrinterPage()),
+                MaterialPageRoute(
+                  builder: (_) => const PrinterPage(),
+                ),
               );
-              if (mounted) setState(() {}); // refresca el estado de conexión al volver
+
+              if (mounted) {
+                setState(() {});
+              }
             },
             child: const Text('Conectar impresora'),
           ),
@@ -122,35 +149,61 @@ class _CobroContenidoState extends State<_CobroContenido> {
     );
   }
 
-  Future<void> _imprimirTicket(Map<String, dynamic> resultado) async {
+  Future<void> _imprimirTicket(
+    Map<String, dynamic> resultado,
+  ) async {
     final registro = resultado['registro'];
     final cuarto = registro['cuarto'];
-    final motel = cuarto?['moteles']?['nombre'] ?? 'Motel';
-    final total = double.parse(resultado['total'].toString()).toStringAsFixed(0);
+
+    final motel =
+        cuarto?['moteles']?['nombre'] ?? 'Motel';
+
+    final total = double
+        .parse(resultado['total'].toString())
+        .toStringAsFixed(0);
+
+    // IMPORTANTE:
+    // Este valor viene directamente de Laravel.
+    // No calculamos nuevamente la duración en Flutter.
+    final minutosTranscurridos = int.parse(
+      resultado['minutos_transcurridos'].toString(),
+    );
 
     final ok = await printerService.imprimirTicket(
       motel: motel,
       numeroCuarto: widget.habitacion.numero,
-      horaEntrada: formatearHora(registro['hora_entrada']),
-      horaSalida: formatearHora(registro['hora_salida']),
+      horaEntrada: formatearHora(
+        registro['hora_entrada'],
+      ),
+      horaSalida: formatearHora(
+        registro['hora_salida'],
+      ),
+      minutosTranscurridos: minutosTranscurridos,
       total: total,
     );
 
     if (!ok && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Se cobró, pero no se pudo imprimir el ticket.')),
+        const SnackBar(
+          content: Text(
+            'Se cobró, pero no se pudo imprimir el ticket.',
+          ),
+        ),
       );
     }
   }
 
   String formatearHora(String isoString) {
     final hora = DateTime.parse(isoString).toLocal();
-    return "${hora.hour.toString().padLeft(2, '0')}:${hora.minute.toString().padLeft(2, '0')}";
+
+    return "${hora.hour.toString().padLeft(2, '0')}:"
+        "${hora.minute.toString().padLeft(2, '0')}";
   }
 
   String formatearTiempo(int minutos) {
     final h = (minutos ~/ 60).toString().padLeft(2, '0');
     final m = (minutos % 60).toString().padLeft(2, '0');
+
     return "$h:$m";
   }
 
@@ -161,7 +214,9 @@ class _CobroContenidoState extends State<_CobroContenido> {
       width: double.infinity,
       decoration: const BoxDecoration(
         color: Color(0xff252536),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(30),
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -176,12 +231,18 @@ class _CobroContenidoState extends State<_CobroContenido> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, color: Colors.redAccent, size: 40),
+            const Icon(
+              Icons.error_outline,
+              color: Colors.redAccent,
+              size: 40,
+            ),
             const SizedBox(height: 12),
             Text(
               error!,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white70),
+              style: const TextStyle(
+                color: Colors.white70,
+              ),
             ),
           ],
         ),
@@ -189,11 +250,19 @@ class _CobroContenidoState extends State<_CobroContenido> {
     }
 
     if (preview == null) {
-      return const Center(child: CircularProgressIndicator(color: Colors.white));
+      return const Center(
+        child: CircularProgressIndicator(
+          color: Colors.white,
+        ),
+      );
     }
 
     final registro = preview!['registro'];
-    final minutos = preview!['minutos_transcurridos'] as int;
+
+    final minutos = int.parse(
+      preview!['minutos_transcurridos'].toString(),
+    );
+
     final total = preview!['total'];
 
     return Column(
@@ -206,29 +275,63 @@ class _CobroContenidoState extends State<_CobroContenido> {
             fontWeight: FontWeight.bold,
           ),
         ),
+
         const SizedBox(height: 30),
-        dato("Hora de entrada", formatearHora(registro['hora_entrada'])),
+
+        dato(
+          "Hora de entrada",
+          formatearHora(
+            registro['hora_entrada'],
+          ),
+        ),
+
         const SizedBox(height: 15),
-        dato("Tiempo transcurrido", formatearTiempo(minutos)),
+
+        dato(
+          "Tiempo transcurrido",
+          formatearTiempo(minutos),
+        ),
+
         const SizedBox(height: 15),
-        dato("Total", "\$${double.parse(total.toString()).toStringAsFixed(0)}"),
+
+        dato(
+          "Total",
+          "\$${double.parse(total.toString()).toStringAsFixed(0)}",
+        ),
+
         const SizedBox(height: 15),
+
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          mainAxisAlignment:
+              MainAxisAlignment.spaceBetween,
           children: [
-            const Text("Impresora", style: TextStyle(color: Colors.white70, fontSize: 14)),
+            const Text(
+              "Impresora",
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 14,
+              ),
+            ),
             Row(
               children: [
                 Icon(
-                  printerService.isConnected ? Icons.print : Icons.print_disabled,
+                  printerService.isConnected
+                      ? Icons.print
+                      : Icons.print_disabled,
                   size: 16,
-                  color: printerService.isConnected ? Colors.greenAccent : Colors.white38,
+                  color: printerService.isConnected
+                      ? Colors.greenAccent
+                      : Colors.white38,
                 ),
                 const SizedBox(width: 6),
                 Text(
-                  printerService.isConnected ? 'Conectada' : 'No conectada',
+                  printerService.isConnected
+                      ? 'Conectada'
+                      : 'No conectada',
                   style: TextStyle(
-                    color: printerService.isConnected ? Colors.greenAccent : Colors.white38,
+                    color: printerService.isConnected
+                        ? Colors.greenAccent
+                        : Colors.white38,
                     fontSize: 13,
                   ),
                 ),
@@ -236,11 +339,15 @@ class _CobroContenidoState extends State<_CobroContenido> {
             ),
           ],
         ),
+
         const Spacer(),
+
         SizedBox(
           width: 300,
           child: ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green,
+            ),
             onPressed: cobrando ? null : cobrar,
             child: cobrando
                 ? const SizedBox(
@@ -253,20 +360,34 @@ class _CobroContenidoState extends State<_CobroContenido> {
                   )
                 : const Text(
                     "COBRAR",
-                    style: TextStyle(color: Colors.white, fontSize: 18),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                    ),
                   ),
           ),
         ),
+
         const SizedBox(height: 20),
       ],
     );
   }
 
-  Widget dato(String titulo, String valor) {
+  Widget dato(
+    String titulo,
+    String valor,
+  ) {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      mainAxisAlignment:
+          MainAxisAlignment.spaceBetween,
       children: [
-        Text(titulo, style: const TextStyle(color: Colors.white70, fontSize: 18)),
+        Text(
+          titulo,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 18,
+          ),
+        ),
         Text(
           valor,
           style: const TextStyle(

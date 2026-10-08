@@ -8,10 +8,9 @@ class TarifasRow extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        _tarjetaTarifa("1 Hora", "\$60"),
-        _tarjetaTarifa("2 Horas", "\$100"),
-        _tarjetaTarifa("3 Horas", "\$150"),
-        _tarjetaTarifa("4 Horas", "\$200"),
+        _tarjetaTarifa("1 Hora", "\$170"),
+        _tarjetaTarifa("2 Horas", "\$210"),
+        _tarjetaTarifa("Hora Extra", "\$80"),
       ],
     );
   }

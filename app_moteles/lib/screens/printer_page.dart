@@ -10,7 +10,8 @@ class PrinterPage extends StatefulWidget {
 }
 
 class _PrinterPageState extends State<PrinterPage> {
-  final printerService = PrinterService.instance;
+  final PrinterService printerService =
+      PrinterService.instance;
 
   List<BluetoothDevice> printers = [];
 
@@ -20,8 +21,34 @@ class _PrinterPageState extends State<PrinterPage> {
   void initState() {
     super.initState();
 
-    printerService.initialize();
+    inicializar();
   }
+
+  // ============================================================
+  // INICIALIZAR BLUETOOTH
+  // ============================================================
+
+  Future<void> inicializar() async {
+    final resultado =
+        await printerService.inicializarBluetooth();
+
+    if (!resultado) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No se pudo inicializar Bluetooth '
+            'o faltan permisos.',
+          ),
+        ),
+      );
+    }
+  }
+
+  // ============================================================
+  // BUSCAR IMPRESORAS
+  // ============================================================
 
   Future<void> buscarImpresoras() async {
     if (_loading) return;
@@ -32,13 +59,20 @@ class _PrinterPageState extends State<PrinterPage> {
     });
 
     try {
-      final devices =
-          await printerService.scanPrinters();
+      await printerService.iniciarEscaneo();
+
+      // Esperamos un poco para permitir que
+      // aparezcan los dispositivos encontrados.
+      await Future.delayed(
+        const Duration(seconds: 5),
+      );
+
+      await printerService.detenerEscaneo();
 
       if (!mounted) return;
 
       setState(() {
-        printers = devices;
+        printers = printerService.devices;
       });
 
       print(
@@ -47,6 +81,16 @@ class _PrinterPageState extends State<PrinterPage> {
     } catch (e) {
       print(
         'ERROR BUSCANDO IMPRESORAS: $e',
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Error buscando impresoras: $e',
+          ),
+        ),
       );
     } finally {
       if (mounted) {
@@ -57,11 +101,15 @@ class _PrinterPageState extends State<PrinterPage> {
     }
   }
 
+  // ============================================================
+  // CONECTAR
+  // ============================================================
+
   Future<void> conectar(
     BluetoothDevice device,
   ) async {
     final connected =
-        await printerService.connect(device);
+        await printerService.conectar(device);
 
     if (!mounted) return;
 
@@ -69,7 +117,8 @@ class _PrinterPageState extends State<PrinterPage> {
       SnackBar(
         content: Text(
           connected
-              ? 'Conectado a ${device.name ?? device.address}'
+              ? 'Conectado a '
+                  '${device.name ?? device.address}'
               : 'No se pudo conectar',
         ),
       ),
@@ -78,9 +127,44 @@ class _PrinterPageState extends State<PrinterPage> {
     setState(() {});
   }
 
+  // ============================================================
+  // DESCONECTAR
+  // ============================================================
+
+  Future<void> desconectar() async {
+    await printerService.desconectar();
+
+    if (!mounted) return;
+
+    setState(() {});
+  }
+
+  // ============================================================
+  // IMPRIMIR PRUEBA
+  // ============================================================
+
   Future<void> imprimir() async {
+    if (!printerService.isConnected) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'No hay una impresora conectada.',
+          ),
+        ),
+      );
+
+      return;
+    }
+
     final result =
-        await printerService.printTest();
+        await printerService.imprimirTicket(
+      motel: 'PRUEBA',
+      numeroCuarto: 1,
+      horaEntrada: '12:00 p.m.',
+      horaSalida: '02:35 p.m.',
+      minutosTranscurridos: 155,
+      total: '100',
+    );
 
     if (!mounted) return;
 
@@ -97,9 +181,13 @@ class _PrinterPageState extends State<PrinterPage> {
 
   @override
   void dispose() {
-    printerService.stopScan();
+    printerService.detenerEscaneo();
     super.dispose();
   }
+
+  // ============================================================
+  // INTERFAZ
+  // ============================================================
 
   @override
   Widget build(BuildContext context) {
@@ -116,6 +204,10 @@ class _PrinterPageState extends State<PrinterPage> {
         children: [
           const SizedBox(height: 16),
 
+          // ----------------------------------------------------
+          // BOTÓN BUSCAR
+          // ----------------------------------------------------
+
           ElevatedButton.icon(
             onPressed:
                 _loading ? null : buscarImpresoras,
@@ -127,13 +219,19 @@ class _PrinterPageState extends State<PrinterPage> {
                       strokeWidth: 2,
                     ),
                   )
-                : const Icon(Icons.search),
+                : const Icon(
+                    Icons.search,
+                  ),
             label: Text(
               _loading
                   ? 'Buscando...'
                   : 'Buscar impresoras',
             ),
           ),
+
+          // ----------------------------------------------------
+          // IMPRESORA CONECTADA
+          // ----------------------------------------------------
 
           if (connected)
             Padding(
@@ -160,18 +258,16 @@ class _PrinterPageState extends State<PrinterPage> {
                     icon: const Icon(
                       Icons.link_off,
                     ),
-                    onPressed: () async {
-                      await printerService
-                          .disconnect();
-
-                      if (mounted) {
-                        setState(() {});
-                      }
-                    },
+                    onPressed:
+                        desconectar,
                   ),
                 ),
               ),
             ),
+
+          // ----------------------------------------------------
+          // LISTA DE IMPRESORAS
+          // ----------------------------------------------------
 
           Expanded(
             child: printers.isEmpty
@@ -189,8 +285,15 @@ class _PrinterPageState extends State<PrinterPage> {
                       final device =
                           printers[index];
 
+                      final yaConectada =
+                          printerService
+                                  .connectedDevice
+                                  ?.address ==
+                              device.address;
+
                       return ListTile(
-                        leading: const Icon(
+                        leading:
+                            const Icon(
                           Icons.bluetooth,
                         ),
                         title: Text(
@@ -201,20 +304,34 @@ class _PrinterPageState extends State<PrinterPage> {
                           device.address,
                         ),
                         trailing:
-                            ElevatedButton(
-                          onPressed: () =>
-                              conectar(
-                            device,
-                          ),
-                          child:
-                              const Text(
-                            'Conectar',
-                          ),
-                        ),
+                            yaConectada
+                                ? const Text(
+                                    'Conectada',
+                                    style:
+                                        TextStyle(
+                                      fontWeight:
+                                          FontWeight.bold,
+                                    ),
+                                  )
+                                : ElevatedButton(
+                                    onPressed:
+                                        () =>
+                                            conectar(
+                                      device,
+                                    ),
+                                    child:
+                                        const Text(
+                                      'Conectar',
+                                    ),
+                                  ),
                       );
                     },
                   ),
           ),
+
+          // ----------------------------------------------------
+          // IMPRIMIR PRUEBA
+          // ----------------------------------------------------
 
           Padding(
             padding:
