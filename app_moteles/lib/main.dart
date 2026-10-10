@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'screens/habitacion.dart';
 import 'services/api_service.dart';
+import 'services/reverb_service.dart';
 import 'widgets/registro.dart';
 import 'widgets/cobro.dart';
 import 'widgets/hab_estados.dart';
@@ -143,8 +144,7 @@ class MotelScreen extends StatefulWidget {
       _MotelScreenState();
 }
 
-class _MotelScreenState
-    extends State<MotelScreen> {
+class _MotelScreenState extends State<MotelScreen> {
   List<Habitacion> habitaciones = [];
 
   bool cargando = true;
@@ -152,18 +152,47 @@ class _MotelScreenState
   String? error;
 
   // NOMBRE DEL MOTEL
-
-  String nombreMotel =
-      'MOTEL EL FARAON';
+  String nombreMotel = 'MOTEL EL FARAON';
 
   @override
   void initState() {
     super.initState();
 
     cargarDatos();
+    conectarReverb();
   }
 
-  // CARGAR USUARIO Y CUARTOS
+  Future<void> conectarReverb() async {
+    try {
+      final motelId = await ApiService.obtenerMotelId();
+
+      if (motelId == null) {
+        print('REVERB: No se encontró motel_id.');
+        return;
+      }
+
+      print('REVERB: Conectando al motel $motelId...');
+
+      await ReverbService.instance.conectar(
+        motelId: motelId,
+        onCuartoActualizado: (data) {
+          print('REVERB: Cuarto actualizado: $data');
+
+          if (!mounted) return;
+
+          cargarCuartos();
+        },
+      );
+    } catch (e) {
+      print('REVERB: Error conectando: $e');
+    }
+  }
+
+  @override
+  void dispose() {
+    ReverbService.instance.desconectar();
+    super.dispose();
+  }
 
   Future<void> cargarDatos() async {
     try {

@@ -1,5 +1,8 @@
 <?php
+
 namespace App\Http\Controllers;
+
+use App\Events\CuartoActualizado;
 use App\Helpers\ResponseHelpers;
 use App\Models\Bitacora;
 use App\Models\Cuartos;
@@ -32,6 +35,13 @@ class BitacoraController extends Controller
 
         $cuarto->ocupado = true;
         $cuarto->save();
+
+        // 🔔 AVISAR A LOS CLIENTES CONECTADOS
+        broadcast(new CuartoActualizado(
+            (int) $cuarto->motel_id,
+            (int) $cuarto->id,
+            'entrada'
+        ));
 
         return ResponseHelpers::success([
             'cuarto' => $cuarto,
@@ -106,6 +116,13 @@ class BitacoraController extends Controller
 
         $registro->setRelation('cuarto', $cuarto);
 
+        // 🔔 AVISAR A LOS CLIENTES CONECTADOS
+        broadcast(new CuartoActualizado(
+            (int) $cuarto->motel_id,
+            (int) $cuarto->id,
+            'salida'
+        ));
+
         return ResponseHelpers::success([
             'registro' => $registro,
             'total' => $total,
@@ -128,55 +145,55 @@ class BitacoraController extends Controller
             'cuarto.moteles',
             'usuario',
         ])
-        ->whereNotNull('hora_salida')
+            ->whereNotNull('hora_salida')
 
-        // USUARIO NORMAL: SOLO SU MOTEL
-        ->when(
-            $usuario->rol !== 'admin',
-            function ($query) use ($usuario) {
-                $query->whereHas('cuarto', function ($q) use ($usuario) {
-                    $q->where('motel_id', $usuario->motel_id);
-                });
-            }
-        )
+            // USUARIO NORMAL: SOLO SU MOTEL
+            ->when(
+                $usuario->rol !== 'admin',
+                function ($query) use ($usuario) {
+                    $query->whereHas('cuarto', function ($q) use ($usuario) {
+                        $q->where('motel_id', $usuario->motel_id);
+                    });
+                }
+            )
 
-        // ADMIN: PUEDE FILTRAR POR MOTEL
-        ->when(
-            $usuario->rol === 'admin' &&
-            !empty($validado['motel_id']),
-            function ($query) use ($validado) {
-                $query->whereHas('cuarto', function ($q) use ($validado) {
-                    $q->where('motel_id', $validado['motel_id']);
-                });
-            }
-        )
+            // ADMIN: PUEDE FILTRAR POR MOTEL
+            ->when(
+                $usuario->rol === 'admin' &&
+                !empty($validado['motel_id']),
+                function ($query) use ($validado) {
+                    $query->whereHas('cuarto', function ($q) use ($validado) {
+                        $q->where('motel_id', $validado['motel_id']);
+                    });
+                }
+            )
 
-        // FECHA INICIAL
-        ->when(
-            !empty($validado['fecha_inicio']),
-            function ($query) use ($validado) {
-                $query->whereDate(
-                    'hora_salida',
-                    '>=',
-                    $validado['fecha_inicio']
-                );
-            }
-        )
+            // FECHA INICIAL
+            ->when(
+                !empty($validado['fecha_inicio']),
+                function ($query) use ($validado) {
+                    $query->whereDate(
+                        'hora_salida',
+                        '>=',
+                        $validado['fecha_inicio']
+                    );
+                }
+            )
 
-        // FECHA FINAL
-        ->when(
-            !empty($validado['fecha_fin']),
-            function ($query) use ($validado) {
-                $query->whereDate(
-                    'hora_salida',
-                    '<=',
-                    $validado['fecha_fin']
-                );
-            }
-        )
+            // FECHA FINAL
+            ->when(
+                !empty($validado['fecha_fin']),
+                function ($query) use ($validado) {
+                    $query->whereDate(
+                        'hora_salida',
+                        '<=',
+                        $validado['fecha_fin']
+                    );
+                }
+            )
 
-        ->orderByDesc('hora_salida')
-        ->paginate(20);
+            ->orderByDesc('hora_salida')
+            ->paginate(20);
 
         // DURACIÓN CALCULADA POR LARAVEL
         $registros->getCollection()->transform(function ($registro) {
