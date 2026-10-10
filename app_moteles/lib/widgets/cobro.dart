@@ -3,6 +3,8 @@ import '../screens/habitacion.dart';
 import '../services/api_service.dart';
 import '../services/printer_service.dart';
 import '../screens/printer_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 
 class MostrarCobro {
   static void show(
@@ -149,49 +151,70 @@ class _CobroContenidoState extends State<_CobroContenido> {
     );
   }
 
-  Future<void> _imprimirTicket(
-    Map<String, dynamic> resultado,
-  ) async {
-    final registro = resultado['registro'];
-    final cuarto = registro['cuarto'];
 
-    final motel =
-        cuarto?['moteles']?['nombre'] ?? 'Motel';
+Future<void> _imprimirTicket(
+  Map<String, dynamic> resultado,
+) async {
+  final registro = resultado['registro'];
+  final cuarto = registro['cuarto'];
 
-    final total = double
-        .parse(resultado['total'].toString())
-        .toStringAsFixed(0);
+  // Primero intenta obtener el nombre desde Laravel.
+  String? motel = cuarto?['moteles']?['nombre']?.toString();
 
-    // IMPORTANTE:
-    // Este valor viene directamente de Laravel.
-    // No calculamos nuevamente la duración en Flutter.
-    final minutosTranscurridos = int.parse(
-      resultado['minutos_transcurridos'].toString(),
-    );
+  // Si Laravel no lo devuelve, lo obtiene de la sesión local.
+  if (motel == null || motel.trim().isEmpty) {
+    final prefs = await SharedPreferences.getInstance();
+    final usuarioJson = prefs.getString('usuario');
 
-    final ok = await printerService.imprimirTicket(
-      motel: motel,
-      numeroCuarto: widget.habitacion.numero,
-      horaEntrada: formatearHora(
-        registro['hora_entrada'],
-      ),
-      horaSalida: formatearHora(
-        registro['hora_salida'],
-      ),
-      minutosTranscurridos: minutosTranscurridos,
-      total: total,
-    );
-
-    if (!ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Se cobró, pero no se pudo imprimir el ticket.',
-          ),
-        ),
-      );
+    if (usuarioJson != null) {
+      try {
+        final usuario = jsonDecode(usuarioJson);
+        motel = usuario['motel']?['nombre']?.toString() ??
+            usuario['moteles']?['nombre']?.toString() ??
+            usuario['motel_nombre']?.toString();
+      } catch (_) {
+        // Si no se puede leer la sesión, continúa con el siguiente paso.
+      }
     }
   }
+
+  // Último recurso.
+  motel = (motel == null || motel.trim().isEmpty)
+      ? 'MOTEL'
+      : motel.trim();
+
+  final total = double
+      .parse(resultado['total'].toString())
+      .toStringAsFixed(0);
+
+  final minutosTranscurridos = int.parse(
+    resultado['minutos_transcurridos'].toString(),
+  );
+
+  final ok = await printerService.imprimirTicket(
+    motel: motel,
+    numeroCuarto: widget.habitacion.numero,
+    horaEntrada: formatearHora(
+      registro['hora_entrada'],
+    ),
+    horaSalida: formatearHora(
+      registro['hora_salida'],
+    ),
+    minutosTranscurridos: minutosTranscurridos,
+    total: total,
+  );
+
+  if (!ok && mounted) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Se cobró, pero no se pudo imprimir el ticket.',
+        ),
+      ),
+    );
+  }
+}
+  //ggggggggggggg
 
   String formatearHora(String isoString) {
     final hora = DateTime.parse(isoString).toLocal();

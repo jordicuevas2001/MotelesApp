@@ -25,7 +25,11 @@ class ApiService {
   // ============================================================
   // TOKEN / SESIÓN
   // ============================================================
-
+  static Future<int?> obtenerMotelId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getInt('motel_id');
+  }
+  
   static Future<String?> obtenerToken() async {
     final prefs = await SharedPreferences.getInstance();
 
@@ -315,9 +319,6 @@ class ApiService {
         return registros;
       }
     }
-
-    // Por seguridad, también aceptamos una lista
-    // si en algún momento Laravel deja de paginar.
 
     if (data is List) {
       return data;
