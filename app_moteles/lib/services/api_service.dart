@@ -5,13 +5,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Backend Laravel.
 ///
 /// Dispositivo físico:
-/// Usa la IP de tu computadora dentro de la red local.
-///
-/// IMPORTANTE:
 /// El celular y la computadora deben estar conectados
 /// a la misma red Wi-Fi.
 const String kBaseUrl = "http://192.168.1.189:8000/api";
-//const String kBaseUrl = "http://10.0.2.2:8000/api";
+// const String kBaseUrl = "http://10.0.2.2:8000/api";
+
 class ApiException implements Exception {
   final String message;
 
@@ -25,14 +23,14 @@ class ApiService {
   // ============================================================
   // TOKEN / SESIÓN
   // ============================================================
+
   static Future<int?> obtenerMotelId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getInt('motel_id');
   }
-  
+
   static Future<String?> obtenerToken() async {
     final prefs = await SharedPreferences.getInstance();
-
     return prefs.getString('token');
   }
 
@@ -43,12 +41,7 @@ class ApiService {
     final prefs = await SharedPreferences.getInstance();
 
     await prefs.setString('token', token);
-
-    await prefs.setString(
-      'usuario',
-      jsonEncode(usuario),
-    );
-
+    await prefs.setString('usuario', jsonEncode(usuario));
     await prefs.setString(
       'rol',
       usuario['rol']?.toString() ?? '',
@@ -60,10 +53,7 @@ class ApiService {
       );
 
       if (motelId != null) {
-        await prefs.setInt(
-          'motel_id',
-          motelId,
-        );
+        await prefs.setInt('motel_id', motelId);
       }
     } else {
       await prefs.remove('motel_id');
@@ -72,17 +62,18 @@ class ApiService {
 
   static Future<Map<String, dynamic>?> obtenerUsuario() async {
     final prefs = await SharedPreferences.getInstance();
+    final usuarioJson = prefs.getString('usuario');
 
-    final usuarioJson =
-        prefs.getString('usuario');
-
-    if (usuarioJson == null) {
-      return null;
-    }
+    if (usuarioJson == null) return null;
 
     try {
-      return jsonDecode(usuarioJson)
-          as Map<String, dynamic>;
+      final decoded = jsonDecode(usuarioJson);
+
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+
+      return null;
     } catch (_) {
       return null;
     }
@@ -90,13 +81,11 @@ class ApiService {
 
   static Future<String?> obtenerRol() async {
     final prefs = await SharedPreferences.getInstance();
-
     return prefs.getString('rol');
   }
 
   static Future<bool> tieneSesion() async {
     final token = await obtenerToken();
-
     return token != null && token.isNotEmpty;
   }
 
@@ -119,14 +108,13 @@ class ApiService {
     return {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
-
       if (token != null && token.isNotEmpty)
         'Authorization': 'Bearer $token',
     };
   }
 
   // ============================================================
-  // PROCESAR RESPUESTA
+  // PROCESAR RESPUESTA LARAVEL
   // ============================================================
 
   static Future<dynamic> _procesar(
@@ -142,18 +130,14 @@ class ApiService {
       );
     }
 
-    // ----------------------------------------------------------
-    // RESPUESTAS CORRECTAS
-    // ----------------------------------------------------------
-
     if (response.statusCode >= 200 &&
         response.statusCode < 300) {
-      return body['data'];
-    }
+      if (body is Map && body.containsKey('data')) {
+        return body['data'];
+      }
 
-    // ----------------------------------------------------------
-    // NO AUTORIZADO
-    // ----------------------------------------------------------
+      return body;
+    }
 
     if (response.statusCode == 401) {
       throw ApiException(
@@ -162,12 +146,8 @@ class ApiService {
       );
     }
 
-    // ----------------------------------------------------------
-    // VALIDACIÓN LARAVEL
-    // ----------------------------------------------------------
-
     if (response.statusCode == 422) {
-      final errores = body['errors'];
+      final errores = body is Map ? body['errors'] : null;
 
       if (errores is Map) {
         final mensajes = <String>[];
@@ -175,28 +155,22 @@ class ApiService {
         errores.forEach((campo, mensajesCampo) {
           if (mensajesCampo is List) {
             mensajes.addAll(
-              mensajesCampo.map(
-                (e) => e.toString(),
-              ),
+              mensajesCampo.map((e) => e.toString()),
             );
           }
         });
 
         if (mensajes.isNotEmpty) {
-          throw ApiException(
-            mensajes.join('\n'),
-          );
+          throw ApiException(mensajes.join('\n'));
         }
       }
     }
 
-    // ----------------------------------------------------------
-    // ERROR GENERAL
-    // ----------------------------------------------------------
+    final mensaje =
+        body is Map ? body['message']?.toString() : null;
 
     throw ApiException(
-      body['message']?.toString() ??
-          'Error desconocido del servidor.',
+      mensaje ?? 'Error desconocido del servidor.',
     );
   }
 
@@ -253,9 +227,7 @@ class ApiService {
     int motelId,
   ) async {
     final res = await http.get(
-      Uri.parse(
-        '$kBaseUrl/moteles/$motelId/tarifas',
-      ),
+      Uri.parse('$kBaseUrl/moteles/$motelId/tarifas'),
       headers: await _headers(),
     );
 
@@ -282,27 +254,19 @@ class ApiService {
     final params = <String, String>{};
 
     if (motelId != null) {
-      params['motel_id'] =
-          motelId.toString();
+      params['motel_id'] = motelId.toString();
     }
 
     if (fechaInicio != null) {
-      params['fecha_inicio'] =
-          fechaInicio;
+      params['fecha_inicio'] = fechaInicio;
     }
 
     if (fechaFin != null) {
-      params['fecha_fin'] =
-          fechaFin;
+      params['fecha_fin'] = fechaFin;
     }
 
-    final uri = Uri.parse(
-      '$kBaseUrl/historial',
-    ).replace(
-      queryParameters:
-          params.isEmpty
-              ? null
-              : params,
+    final uri = Uri.parse('$kBaseUrl/historial').replace(
+      queryParameters: params.isEmpty ? null : params,
     );
 
     final res = await http.get(
@@ -312,16 +276,12 @@ class ApiService {
 
     final data = await _procesar(res);
 
+    if (data is List) return data;
+
     if (data is Map<String, dynamic>) {
       final registros = data['data'];
 
-      if (registros is List) {
-        return registros;
-      }
-    }
-
-    if (data is List) {
-      return data;
+      if (registros is List) return registros;
     }
 
     return [];
@@ -339,27 +299,19 @@ class ApiService {
     final params = <String, String>{};
 
     if (motelId != null) {
-      params['motel_id'] =
-          motelId.toString();
+      params['motel_id'] = motelId.toString();
     }
 
     if (fechaInicio != null) {
-      params['fecha_inicio'] =
-          fechaInicio;
+      params['fecha_inicio'] = fechaInicio;
     }
 
     if (fechaFin != null) {
-      params['fecha_fin'] =
-          fechaFin;
+      params['fecha_fin'] = fechaFin;
     }
 
-    final uri = Uri.parse(
-      '$kBaseUrl/resumen',
-    ).replace(
-      queryParameters:
-          params.isEmpty
-              ? null
-              : params,
+    final uri = Uri.parse('$kBaseUrl/resumen').replace(
+      queryParameters: params.isEmpty ? null : params,
     );
 
     final res = await http.get(
@@ -382,8 +334,7 @@ class ApiService {
   // REPORTE DETALLADO PARA PDF
   // ============================================================
 
-  static Future<Map<String, dynamic>>
-      obtenerReporteDetallado({
+  static Future<Map<String, dynamic>> obtenerReporteDetallado({
     int? motelId,
     required String fechaInicio,
     required String fechaFin,
@@ -394,15 +345,12 @@ class ApiService {
     };
 
     if (motelId != null) {
-      params['motel_id'] =
-          motelId.toString();
+      params['motel_id'] = motelId.toString();
     }
 
     final uri = Uri.parse(
       '$kBaseUrl/reporte-detallado',
-    ).replace(
-      queryParameters: params,
-    );
+    ).replace(queryParameters: params);
 
     final res = await http.get(
       uri,
@@ -427,9 +375,7 @@ class ApiService {
 
   static Future<List<dynamic>> obtenerCuartos() async {
     final res = await http.get(
-      Uri.parse(
-        '$kBaseUrl/cuartos',
-      ),
+      Uri.parse('$kBaseUrl/cuartos'),
       headers: await _headers(),
     );
 
@@ -448,14 +394,11 @@ class ApiService {
   // ENTRADA
   // ============================================================
 
-  static Future<Map<String, dynamic>>
-      registrarEntrada(
+  static Future<Map<String, dynamic>> registrarEntrada(
     int cuartoId,
   ) async {
     final res = await http.post(
-      Uri.parse(
-        '$kBaseUrl/cuartos/$cuartoId/entrada',
-      ),
+      Uri.parse('$kBaseUrl/cuartos/$cuartoId/entrada'),
       headers: await _headers(),
     );
 
@@ -471,17 +414,14 @@ class ApiService {
   }
 
   // ============================================================
-  // COBRO
+  // VISTA PREVIA DEL COBRO
   // ============================================================
 
-  static Future<Map<String, dynamic>>
-      previewCobro(
+  static Future<Map<String, dynamic>> previewCobro(
     int cuartoId,
   ) async {
     final res = await http.get(
-      Uri.parse(
-        '$kBaseUrl/cuartos/$cuartoId/cobro',
-      ),
+      Uri.parse('$kBaseUrl/cuartos/$cuartoId/cobro'),
       headers: await _headers(),
     );
 
@@ -497,18 +437,15 @@ class ApiService {
   }
 
   // ============================================================
-  // SALIDA
+  // SALIDA / COBRAR
   // ============================================================
 
-  static Future<Map<String, dynamic>>
-      registrarSalida(
+  static Future<Map<String, dynamic>> registrarSalida(
     int cuartoId, {
     String? observaciones,
   }) async {
     final res = await http.post(
-      Uri.parse(
-        '$kBaseUrl/cuartos/$cuartoId/salida',
-      ),
+      Uri.parse('$kBaseUrl/cuartos/$cuartoId/salida'),
       headers: await _headers(),
       body: jsonEncode({
         'observaciones': observaciones,
@@ -520,6 +457,108 @@ class ApiService {
     if (data is! Map<String, dynamic>) {
       throw ApiException(
         'La respuesta de salida no tiene un formato válido.',
+      );
+    }
+
+    return data;
+  }
+
+  // ============================================================
+  // TURNOS: INICIAR
+  // POST /turnos/iniciar
+  // ============================================================
+
+  static Future<Map<String, dynamic>> iniciarTurno() async {
+    final res = await http.post(
+      Uri.parse('$kBaseUrl/turnos/iniciar'),
+      headers: await _headers(),
+    );
+
+    final data = await _procesar(res);
+
+    if (data is! Map<String, dynamic>) {
+      throw ApiException(
+        'La respuesta de inicio de turno no es válida.',
+      );
+    }
+
+    return data;
+  }
+
+  // ============================================================
+  // TURNOS: CONSULTAR TURNO ACTUAL
+  // GET /turnos/actual
+  //
+  // Devuelve el turno abierto o null si no hay ninguno.
+  // ============================================================
+
+  static Future<Map<String, dynamic>?> obtenerTurnoActual() async {
+    final res = await http.get(
+      Uri.parse('$kBaseUrl/turnos/actual'),
+      headers: await _headers(),
+    );
+
+    final data = await _procesar(res);
+
+    if (data is! Map<String, dynamic>) {
+      throw ApiException(
+        'La respuesta del turno actual no es válida.',
+      );
+    }
+
+    final turno = data['turno'];
+
+    if (turno == null) return null;
+
+    if (turno is! Map<String, dynamic>) {
+      throw ApiException(
+        'Los datos del turno actual no son válidos.',
+      );
+    }
+
+    return turno;
+  }
+
+  // ============================================================
+  // TURNOS: CERRAR
+  // POST /turnos/cerrar
+  // ============================================================
+
+  static Future<Map<String, dynamic>> cerrarTurno() async {
+    final res = await http.post(
+      Uri.parse('$kBaseUrl/turnos/cerrar'),
+      headers: await _headers(),
+    );
+
+    final data = await _procesar(res);
+
+    if (data is! Map<String, dynamic>) {
+      throw ApiException(
+        'La respuesta de cierre de turno no es válida.',
+      );
+    }
+
+    return data;
+  }
+
+  // ============================================================
+  // TURNOS: REPORTE
+  // GET /turnos/{id}/reporte
+  // ============================================================
+
+  static Future<Map<String, dynamic>> obtenerReporteTurno(
+    int turnoId,
+  ) async {
+    final res = await http.get(
+      Uri.parse('$kBaseUrl/turnos/$turnoId/reporte'),
+      headers: await _headers(),
+    );
+
+    final data = await _procesar(res);
+
+    if (data is! Map<String, dynamic>) {
+      throw ApiException(
+        'La respuesta del reporte del turno no es válida.',
       );
     }
 

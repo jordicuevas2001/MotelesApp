@@ -1,119 +1,93 @@
 <?php
+
+use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\MotelesController;
 use App\Http\Controllers\CuartosController;
 use App\Http\Controllers\BitacoraController;
 use App\Http\Controllers\UsuariosController;
-use Illuminate\Support\Facades\Route;
 
+// Ruta pública para iniciar sesión
+Route::post('/login', [UsuariosController::class, 'login']);
 
-    //ruta publica para realizar el login
+// Rutas protegidas por autenticación
+Route::middleware('auth:sanctum')->group(function () {
 
-    Route::post('/login', [UsuariosController::class, 'login']);
-
-
-    //ruta de autenticacion protegida
-
-    Route::middleware('auth:sanctum')->group(function () {
-
-    //cuartos
-    // Las puede utilizar admin y usuario
+    // =========================
+    // CUARTOS
+    // =========================
 
     Route::get('/cuartos', [CuartosController::class, 'cuartos']);
 
     Route::post('/agregarcuarto', [CuartosController::class, 'crearCuarto']);
 
-    Route::put(
-        '/actualizarcuarto/{id}',
-        [CuartosController::class, 'actualizarCuarto']
-    );
+    Route::put('/actualizarcuarto/{id}', [CuartosController::class, 'actualizarCuarto']);
 
-    Route::delete(
-        '/eliminarcuarto/{id}',
-        [CuartosController::class, 'eliminarCuarto']
-    );
+    Route::delete('/eliminarcuarto/{id}', [CuartosController::class, 'eliminarCuarto']);
 
-    Route::get(
-        '/vercuarto/{id}',
-        [CuartosController::class, 'verCuarto']
-    );
+    Route::get('/vercuarto/{id}', [CuartosController::class, 'verCuarto']);
 
 
-    //bitacora
-    // Las puede utilizar admin y usuario
+    // =========================
+    // BITÁCORA Y COBROS
+    // =========================
 
-    Route::post(
-        '/cuartos/{id}/entrada',
-        [BitacoraController::class, 'registrarEntrada']
-    );
+    Route::post('/cuartos/{id}/entrada', [BitacoraController::class, 'registrarEntrada']);
 
-    Route::get(
-        '/cuartos/{id}/cobro',
-        [BitacoraController::class, 'previewCobro']
-    );
+    Route::get('/cuartos/{id}/cobro', [BitacoraController::class, 'previewCobro']);
 
-    Route::post('/cuartos/{id}/salida',[BitacoraController::class, 'registrarSalida']);
+    Route::post('/cuartos/{id}/salida', [BitacoraController::class, 'registrarSalida']);
 
-    Route::get('/historial',[BitacoraController::class, 'historial']);
+    Route::get('/historial', [BitacoraController::class, 'historial']);
+
     Route::get('/resumen', [BitacoraController::class, 'resumen']);
-    Route::get('/reporte-detallado',[BitacoraController::class, 'reporteDetallado']
-    );
 
-        //solo permisos de admin
+    Route::get('/reporte-detallado', [BitacoraController::class, 'reporteDetallado']);
+
+
+    // =========================
+    // TURNOS
+    // =========================
+
+    // Iniciar turno del empleado
+    Route::post('/turnos/iniciar', [BitacoraController::class, 'iniciarTurno']);
+
+    // Consultar turno abierto del empleado
+    Route::get('/turnos/actual', [BitacoraController::class, 'turnoActual']);
+
+    // Cerrar turno del empleado
+    Route::post('/turnos/cerrar', [BitacoraController::class, 'cerrarTurno']);
+
+    // Consultar reporte de un turno
+    Route::get('/turnos/{id}/reporte', [BitacoraController::class, 'reporteTurno']);
+
+
+    // =========================
+    // RUTAS EXCLUSIVAS DE ADMIN
+    // =========================
+
     Route::middleware('rol:admin')->group(function () {
 
-       //rutas que pueden usar los usuarios
+        // Usuarios
+        Route::get('/obtenerusuarios', [UsuariosController::class, 'obtenerUsuarios']);
 
-        Route::get(
-            '/obtenerusuarios',
-            [UsuariosController::class, 'obtenerUsuarios']
-        );
+        Route::get('/verusuario/{id}', [UsuariosController::class, 'verUsuario']);
 
-        Route::get(
-            '/verusuario/{id}',
-            [UsuariosController::class, 'verUsuario']
-        );
+        Route::post('/crearusuarios', [UsuariosController::class, 'crearUsuario']);
 
-        Route::post(
-            '/crearusuarios',
-            [UsuariosController::class, 'crearUsuario']
-        );
+        Route::put('/actualizarusuario/{id}', [UsuariosController::class, 'actualizarUsuario']);
 
-        Route::put(
-            '/actualizarusuario/{id}',
-            [UsuariosController::class, 'actualizarUsuario']
-        );
-
-        Route::delete(
-            '/eliminarusuario/{id}',
-            [UsuariosController::class, 'eliminarUsuario']
-        );
+        Route::delete('/eliminarusuario/{id}', [UsuariosController::class, 'eliminarUsuario']);
 
 
-      //para los moteles
+        // Moteles
+        Route::get('/moteles', [MotelesController::class, 'moteles']);
 
-        Route::get(
-            '/moteles',
-            [MotelesController::class, 'moteles']
-        );
+        Route::get('/vermotel/{id}', [MotelesController::class, 'verMotel']);
 
-        Route::get(
-            '/vermotel/{id}',
-            [MotelesController::class, 'verMotel']
-        );
+        Route::post('/agregarmotel', [MotelesController::class, 'crearMotel']);
 
-        Route::post(
-            '/agregarmotel',
-            [MotelesController::class, 'crearMotel']
-        );
+        Route::put('/actualizarmotel/{id}', [MotelesController::class, 'actualizarMotel']);
 
-        Route::put(
-            '/actualizarmotel/{id}',
-            [MotelesController::class, 'actualizarMotel']
-        );
-
-        Route::delete(
-            '/eliminarmotel/{id}',
-            [MotelesController::class, 'EliminarMotel']
-        );
+        Route::delete('/eliminarmotel/{id}', [MotelesController::class, 'EliminarMotel']);
     });
 });
