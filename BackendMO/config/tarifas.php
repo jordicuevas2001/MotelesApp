@@ -6,6 +6,8 @@ return [
 
         1 => [ // El Faraón
 
+            'minutos_gratis' => 10,
+
             'franjas' => [
                 [
                     'horas' => 1,
@@ -21,6 +23,8 @@ return [
         ],
 
         2 => [ // La Curva
+
+            'minutos_gratis' => 10,
 
             'franjas' => [
                 [
