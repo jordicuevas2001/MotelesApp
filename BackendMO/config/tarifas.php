@@ -11,15 +11,15 @@ return [
             'franjas' => [
                 [
                     'horas' => 1,
-                    'precio' => 170,
+                    'precio' => 200,
                 ],
                 [
                     'horas' => 2,
-                    'precio' => 210,
+                    'precio' => 270,
                 ],
             ],
 
-            'precio_hora_extra' => 80,
+            'precio_hora_extra' => 100,
         ],
 
         2 => [ // La Curva
