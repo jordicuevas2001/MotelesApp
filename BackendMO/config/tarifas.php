@@ -1,3 +1,4 @@
+
 <?php
 
 return [
@@ -10,11 +11,11 @@ return [
 
             'franjas' => [
                 [
-                    'horas' => 1.1,
+                    'horas' => 70 / 60,
                     'precio' => 200,
                 ],
                 [
-                    'horas' => 2.1,
+                    'horas' => 130 / 60,
                     'precio' => 270,
                 ],
             ],
@@ -28,11 +29,11 @@ return [
 
             'franjas' => [
                 [
-                    'horas' => 1.1,
+                    'horas' => 70 / 60,
                     'precio' => 170,
                 ],
                 [
-                    'horas' => 2.1,
+                    'horas' => 130 / 60,
                     'precio' => 210,
                 ],
             ],
