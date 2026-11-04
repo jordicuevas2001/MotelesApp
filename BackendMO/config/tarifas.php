@@ -6,15 +6,15 @@ return [
 
         1 => [ // El Faraón
 
-            'minutos_gratis' => 10,
+            'minutos_gratis' => 5,
 
             'franjas' => [
                 [
-                    'horas' => 1,
+                    'horas' => 1.1,
                     'precio' => 200,
                 ],
                 [
-                    'horas' => 2,
+                    'horas' => 2.1,
                     'precio' => 270,
                 ],
             ],
@@ -24,15 +24,15 @@ return [
 
         2 => [ // La Curva
 
-            'minutos_gratis' => 10,
+            'minutos_gratis' => 5,
 
             'franjas' => [
                 [
-                    'horas' => 1,
+                    'horas' => 1.1,
                     'precio' => 170,
                 ],
                 [
-                    'horas' => 2,
+                    'horas' => 2.1,
                     'precio' => 210,
                 ],
             ],
